@@ -1,6 +1,7 @@
 // tank_shooter_v4_0.cpp
-// Tank Shooter v4.0 - Phase 1: smarter enemies, improved graphics & explosions
+// Tank Shooter v4.0 - Phase 1 + Multi-Tank Designs (v3.6 -> merged)
 
+// (All includes and platform helpers unchanged)
 #include <iostream>
 #include <vector>
 #include <chrono>
@@ -107,7 +108,11 @@ const string COL_EXP1 = fgColor(33);
 const string COL_EXP2 = fgColor(91);
 
 // ---------- Entities ----------
-struct Bullet { int x, y, dy; Bullet(int _x,int _y,int _dy):x(_x),y(_y),dy(_dy){} };
+struct Bullet {
+  int x, y, dy, dmg;
+  char ch;
+  Bullet(int _x,int _y,int _dy,int _dmg,char _ch):x(_x),y(_y),dy(_dy),dmg(_dmg),ch(_ch){}
+};
 
 enum EnemyType { NORMAL, FAST, STRONG, BOUNCER, ZIGZAG, CHASER };
 struct Enemy {
@@ -124,11 +129,25 @@ struct Enemy {
   }
 };
 
-struct Tank { int x, y; int hp; string type; int speed; int fireRate; };
-struct Explosion { int x, y; int life; Explosion(int _x,int _y,int _life):x(_x),y(_y),life(_life){} };
+struct Tank {
+  int x, y;
+  int hp;
+  string type;
+  int speed;
+  int fireRate;
+  int shotDamage;   // damage per bullet
+  int shotCount;    // number of bullets per shot
+  int shieldCount;  // shields available
+  Tank(int _x=0,int _y=0,int _hp=5,string _type="Standard",int _speed=1,int _fireRate=6,
+       int _shotDamage=1,int _shotCount=1,int _shieldCount=0)
+    : x(_x), y(_y), hp(_hp), type(_type), speed(_speed), fireRate(_fireRate),
+      shotDamage(_shotDamage), shotCount(_shotCount), shieldCount(_shieldCount) {}
+};
+
+struct Explosion { int x, y, life; Explosion(int _x,int _y,int _life):x(_x),y(_y),life(_life){} };
 
 // ---------- State ----------
-Tank player{WIDTH/2, HEIGHT-4, 5, "Standard", 1, 6};
+Tank player{WIDTH/2, HEIGHT-4, 5, "Standard", 1, 6, 1, 1, 0};
 vector<Bullet> bullets;
 vector<Enemy> enemies;
 vector<Explosion> explosions;
@@ -157,34 +176,76 @@ void drawBorder(vector<string> &scr) {
   }
 }
 
-// ---------- Drawings (rich ASCII per type) ----------
+// ---------- Drawings (per tank type & enemy type) ----------
 void drawTankShape(vector<string> &scr, const Tank &t) {
-  vector<pair<int,int>> shape = {{0,0},{-1,-1},{1,-1},{-2,-2},{0,-2},{2,-2},{0,-3}};
-  for (auto &p : shape) {
-    int nx = t.x + p.first, ny = t.y + p.second;
+  // Draw different ASCII shapes depending on t.type
+  if (t.type == "Standard") {
+    vector<pair<int,int>> shape = {{0,0},{-1,-1},{1,-1},{-2,-2},{0,-2},{2,-2},{0,-3}};
+    for (auto &p : shape) {
+      int nx = t.x + p.first, ny = t.y + p.second;
+      if (nx>=1 && nx<WIDTH-1 && ny>=1 && ny<HEIGHT-1) scr[ny][nx] = '*';
+    }
+  } else if (t.type == "Heavy") {
+    // bigger block with '#'
+    vector<pair<int,int>> shape = {{0,0},{-1,0},{1,0},{-2,-1},{-1,-1},{0,-1},{1,-1},{2,-1}};
+    for (auto &p : shape) {
+      int nx = t.x + p.first, ny = t.y + p.second;
+      if (nx>=1 && nx<WIDTH-1 && ny>=1 && ny<HEIGHT-1) scr[ny][nx] = '#';
+    }
+  } else if (t.type == "Light") {
+    // compact plus
+    vector<pair<int,int>> shape = {{0,0},{0,-1},{-1,0},{1,0},{0,1}};
+    for (auto &p : shape) {
+      int nx = t.x + p.first, ny = t.y + p.second;
+      if (nx>=1 && nx<WIDTH-1 && ny>=1 && ny<HEIGHT-1) scr[ny][nx] = '+';
+    }
+  } else if (t.type == "Sniper") {
+    // narrow '^' turret and small body
+    vector<pair<int,int>> shape = {{0,-2},{0,0},{0,-1},{-1,0},{1,0}};
+    for (auto &p : shape) {
+      int nx = t.x + p.first, ny = t.y + p.second;
+      if (nx>=1 && nx<WIDTH-1 && ny>=1 && ny<HEIGHT-1) scr[ny][nx] = (p.first==0 && p.second==-2) ? '^' : (p.first==0 && p.second==-1 ? '^' : (p.first==0 && p.second==0 ? 'v' : '|'));
+    }
+  } else if (t.type == "RapidFire") {
+    // long barrel = and small base
+    vector<pair<int,int>> shape = {{-1,0},{0,0},{1,0},{0,-1},{0,-2}};
+    for (auto &p : shape) {
+      int nx = t.x + p.first, ny = t.y + p.second;
+      if (nx>=1 && nx<WIDTH-1 && ny>=1 && ny<HEIGHT-1) scr[ny][nx] = (p.first==0 && p.second<=0) ? '=' : '=';
+    }
+  } else if (t.type == "Plasma") {
+    // futuristic omega shape (use 'Ω' if terminal supports)
+    vector<pair<int,int>> shape = {{0,0},{-1,-1},{1,-1},{-1,1},{1,1}};
+    for (auto &p : shape) {
+      int nx = t.x + p.first, ny = t.y + p.second;
+      if (nx>=1 && nx<WIDTH-1 && ny>=1 && ny<HEIGHT-1) {
+        // use capital O-like char for safe ASCII fallback
+        scr[ny][nx] = (p.first==0 && p.second==0) ? 'Ω' : 'o';
+      }
+    }
+  } else {
+    // fallback: simple *
+    vector<pair<int,int>> shape = {{0,0}};
+    int nx = t.x, ny = t.y;
     if (nx>=1 && nx<WIDTH-1 && ny>=1 && ny<HEIGHT-1) scr[ny][nx] = '*';
   }
 }
 
-// draw enemies with different shapes (keeps to 1-3 cell sizes)
+// draw enemies (unchanged from your version)
 void drawEnemyShape(vector<string> &scr, const Enemy &e) {
   bool blink = (tickCount/5)%2;
   switch (e.type) {
     case NORMAL: {
-      // 2x2 box
-      const char *s0 = "[]";
-      const char *s1 = "[]";
       for (int dy=0; dy<2; ++dy)
         for (int dx=0; dx<2; ++dx) {
           int nx = e.x + dx, ny = e.y + dy;
           if (nx>=1 && nx<WIDTH-1 && ny>=1 && ny<HEIGHT-1)
-            scr[ny][nx] = (dx==0 && dy==0) ? '#' : '#';
+            scr[ny][nx] = '#';
         }
       break;
     }
     case FAST: {
-      // sleek arrow - blinks
-      string s = blink ? "/^\\": "\\_/";
+      string s = blink ? "/^\\" : "\\_/";
       int baseX = e.x - 1, baseY = e.y;
       for (int i=0;i<(int)s.size();++i) {
         int nx = baseX + i, ny = baseY;
@@ -193,9 +254,8 @@ void drawEnemyShape(vector<string> &scr, const Enemy &e) {
       break;
     }
     case STRONG: {
-      // 3x2 heavy block
-      const string shape0 = "+-+";
-      const string shape1 = "+-+";
+      const string shape0 = "╔═╗";
+      const string shape1 = "╚═╝";
       for (int dx=0; dx<3; ++dx) {
         int nx0 = e.x + dx - 1, ny0 = e.y - 1;
         int nx1 = e.x + dx - 1, ny1 = e.y;
@@ -205,7 +265,6 @@ void drawEnemyShape(vector<string> &scr, const Enemy &e) {
       break;
     }
     case BOUNCER: {
-      // little bouncer with & center
       vector<pair<int,int>> parts = {{0,0},{-1,0},{1,0},{0,1}};
       for (auto &p: parts) {
         int nx = e.x + p.first, ny = e.y + p.second;
@@ -214,7 +273,6 @@ void drawEnemyShape(vector<string> &scr, const Enemy &e) {
       break;
     }
     case ZIGZAG: {
-      // Z shape
       vector<pair<int,int>> parts = {{0,0},{1,1},{-1,1}};
       for (auto &p: parts) {
         int nx = e.x + p.first, ny = e.y + p.second;
@@ -223,7 +281,6 @@ void drawEnemyShape(vector<string> &scr, const Enemy &e) {
       break;
     }
     default: { // CHASER
-      // chaser uses 'C'
       int nx = e.x, ny = e.y;
       if (nx>=1 && nx<WIDTH-1 && ny>=1 && ny<HEIGHT-1) scr[ny][nx] = 'C';
       break;
@@ -232,10 +289,9 @@ void drawEnemyShape(vector<string> &scr, const Enemy &e) {
 }
 
 void drawBulletShape(vector<string> &scr, const Bullet &b) {
-  if (b.x>=1 && b.x<WIDTH-1 && b.y>=1 && b.y<HEIGHT-1) scr[b.y][b.x] = '|';
+  if (b.x>=1 && b.x<WIDTH-1 && b.y>=1 && b.y<HEIGHT-1) scr[b.y][b.x] = b.ch;
 }
 
-// explosion fills few cells depending on phase
 void drawExplosions(vector<string> &scr) {
   for (auto &ex: explosions) {
     int phase = ex.life % 3;
@@ -251,7 +307,7 @@ void drawExplosions(vector<string> &scr) {
   }
 }
 
-// ---------- Logic ----------
+// ---------- Logic (enemy spawn & AI unchanged) ----------
 void spawnEnemiesByLevel() {
   int cnt = 1 + rand() % min(4, level + 1);
   for (int i=0;i<cnt;i++) {
@@ -279,7 +335,26 @@ void processInputGameplay() {
     else if (c == 'w') player.y -= player.speed;
     else if (c == 's') player.y += player.speed;
     else if (c == ' ' && shootCooldown == 0) {
-      bullets.emplace_back(player.x, player.y-4, -1);
+      // choose bullet char by player.type
+      char bch = '|';
+      if (player.type == "Standard") bch = '|';
+      else if (player.type == "Heavy") bch = '#';
+      else if (player.type == "Light") bch = ':';
+      else if (player.type == "Sniper") bch = '-';
+      else if (player.type == "RapidFire") bch = '!';
+      else if (player.type == "Plasma") bch = '*';
+
+      // spawn bullets according to shotCount
+      if (player.shotCount <= 1) {
+        bullets.emplace_back(player.x, player.y-4, -1, player.shotDamage, bch);
+      } else if (player.shotCount == 2) {
+        bullets.emplace_back(player.x-1, player.y-4, -1, player.shotDamage, bch);
+        bullets.emplace_back(player.x+1, player.y-4, -1, player.shotDamage, bch);
+      } else {
+        bullets.emplace_back(player.x-1, player.y-4, -1, player.shotDamage, bch);
+        bullets.emplace_back(player.x,   player.y-4, -1, player.shotDamage, bch);
+        bullets.emplace_back(player.x+1, player.y-4, -1, player.shotDamage, bch);
+      }
       shootCooldown = player.fireRate;
     }
     else if (c == 'q') running = false;
@@ -295,34 +370,23 @@ void updateGameLogic() {
   bullets.erase(remove_if(bullets.begin(), bullets.end(),
     [](const Bullet &b){ return b.y < 1; }), bullets.end());
 
-  // Determine a global enemy move delay (slower overall)
-  int globalDelay = max(2, 10 - level/2); // larger -> slower
-  // per-type speed multiplier (1 = moves when tick % globalDelay == 0)
+  // global delay to slow enemies slightly
+  int globalDelay = max(2, 10 - level/2);
+
   for (auto &e : enemies) {
     bool doMove = false;
     if (e.type == FAST) {
-      // fast moves a bit more often, but we reduced overall speed: move when tick%max(1,globalDelay/2)==0
       int d = max(1, globalDelay/2);
       doMove = (tickCount % d) == 0;
-    } else if (e.type == CHASER) {
-      // chaser moves slightly slower but will home towards player when in range
-      doMove = (tickCount % globalDelay) == 0;
     } else {
       doMove = (tickCount % globalDelay) == 0;
     }
-
     if (!doMove) continue;
 
     switch (e.type) {
-      case FAST:
-        e.y += 1; // reduced from 2 -> 1
-        break;
-      case STRONG:
-        e.y += 1;
-        break;
-      case NORMAL:
-        e.y += 1;
-        break;
+      case FAST: e.y += 1; break;
+      case STRONG: e.y += 1; break;
+      case NORMAL: e.y += 1; break;
       case BOUNCER:
         e.y += 1;
         e.x += e.dir;
@@ -335,15 +399,12 @@ void updateGameLogic() {
         if (e.x <= 2 || e.x >= WIDTH-3) e.dir *= -1;
         break;
       case CHASER: {
-        // If within horizontal range, move toward player
         int dx = player.x - e.x;
         int dy = player.y - e.y;
         if (abs(dx) <= 20 && abs(dy) <= 10) {
-          // home in
           e.x += (dx==0?0: (dx>0?1:-1));
           e.y += (dy==0?0: (dy>0?1:-1));
         } else {
-          // fallback slow descent
           e.y += 1;
         }
         break;
@@ -355,14 +416,13 @@ void updateGameLogic() {
   if (tickCount % max(8, enemySpawnRate - level*3) == 0)
     spawnEnemiesByLevel();
 
-  // bullet vs enemy collisions
+  // collisions
   vector<int> rmB, rmE;
   for (int i=0;i<(int)bullets.size();++i) {
     for (int j=0;j<(int)enemies.size();++j) {
-      // collision threshold depends on enemy size; use <=1
       if (abs(bullets[i].x - enemies[j].x) <= 1 && abs(bullets[i].y - enemies[j].y) <= 1) {
         rmB.push_back(i);
-        enemies[j].hp--;
+        enemies[j].hp -= bullets[i].dmg;
         explosions.emplace_back(bullets[i].x, bullets[i].y, EXPLOSION_FRAMES/2);
         if (enemies[j].hp <= 0) {
           rmE.push_back(j);
@@ -383,27 +443,35 @@ void updateGameLogic() {
   explosions.erase(remove_if(explosions.begin(), explosions.end(),
     [](const Explosion &e){ return e.life <= 0; }), explosions.end());
 
-  // player collision -> immediate end (as you requested)
-  for (auto &e : enemies) {
-    // use bigger threshold for larger enemies
+  // player collision -> immediate end unless shield present
+  for (int idx = (int)enemies.size()-1; idx >= 0; --idx) {
+    Enemy &e = enemies[idx];
     int thresh = (e.type==STRONG)?3:2;
     if (abs(e.x - player.x) <= thresh && abs(e.y - player.y) <= thresh) {
-      explosions.emplace_back(e.x, e.y, EXPLOSION_FRAMES);
-      explosions.emplace_back(player.x, player.y, EXPLOSION_FRAMES);
-      running = false;
-      return;
+      if (player.shieldCount > 0) {
+        player.shieldCount--;
+        explosions.emplace_back(e.x, e.y, EXPLOSION_FRAMES);
+        explosions.emplace_back(player.x, player.y, EXPLOSION_FRAMES/2);
+        enemies.erase(enemies.begin() + idx);
+        score += 5;
+        continue;
+      } else {
+        explosions.emplace_back(e.x, e.y, EXPLOSION_FRAMES);
+        explosions.emplace_back(player.x, player.y, EXPLOSION_FRAMES);
+        running = false;
+        return;
+      }
     }
   }
 
-  // remove enemies that pass bottom
+  // remove enemies that passed bottom
   enemies.erase(remove_if(enemies.begin(), enemies.end(),
     [](const Enemy &e){ return e.y >= HEIGHT-3; }), enemies.end());
 
-  // level up by score
+  // level up
   if (score >= level * 200) {
     level++;
     player.hp = min(player.hp + 1, 9);
-    // small visual reward: spawn a couple of enemies away from player
     for (int i=0;i<2;i++) spawnEnemiesByLevel();
   }
 }
@@ -429,28 +497,33 @@ string buildOutputBuffer(const vector<string> &scr) {
     for (int x=0;x<WIDTH;x++) {
       char ch = scr[y][x];
       if (ch == '*') {
-        // explosion/pulse: alternate colors by tickCount
         if ((tickCount/2)%2==0) out += COL_EXP1 + "*" + colorReset();
         else out += COL_EXP2 + "*" + colorReset();
       }
-      else if (ch == '#') out += fgColor(91) + "#" + colorReset();        // normal
-      else if (ch == '/' || ch == '\\' || ch == '_' || ch == '^') out += fgColor(95) + string(1,ch) + colorReset(); // fast blink
-      else if (ch == '+' || ch == '-' || ch == '+' || ch == '+') out += fgColor(34) + string(1,ch) + colorReset(); // strong in blue
+      else if (ch == '#') out += fgColor(91) + "#" + colorReset();
+      else if (ch == '/' || ch == '\\' || ch == '_' || ch == '^') out += fgColor(95) + string(1,ch) + colorReset();
+      else if (ch == '╔' || ch == '═' || ch == '╚' || ch == '╝') out += fgColor(34) + string(1,ch) + colorReset();
       else if (ch == '=') out += fgColor(93) + "=" + colorReset();
       else if (ch == '&') out += fgColor(93) + "&" + colorReset();
       else if (ch == 'Z') out += fgColor(96) + "Z" + colorReset();
       else if (ch == 'C') out += fgColor(95) + "C" + colorReset();
-      else if (ch == '|') out += COL_BULLET + "|" + colorReset();
-      else if (ch == '-' || ch == '|') out += COL_BORDER + ch + colorReset();
+      else if (ch == '-' ) out += fgColor(96) + "-" + colorReset();
+      else if (ch == '!' ) out += fgColor(93) + "!" + colorReset();
+      else if (ch == '*' ) out += fgColor(35) + "*" + colorReset(); // plasma bullet color
+      else if (ch == ':' ) out += fgColor(97) + ":" + colorReset();
+      else if (ch == 'Ω' || ch == 'o') out += fgColor(36) + string(1,ch) + colorReset();
+      else if (ch == '|' ) out += COL_BULLET + "|" + colorReset();
+      else if (ch == '-' || ch == '|' ) out += COL_BORDER + ch + colorReset();
       else out.push_back(ch);
     }
     out.push_back('\n');
   }
 
-  // HUD line with enemy counts (compact)
+  // HUD line
   out += COL_TEXT + string(" Tank: ") + player.type +
          " | Score: " + to_string(score) +
          " | HP: " + to_string(player.hp) +
+         " | Shields: " + to_string(player.shieldCount) +
          " | Level: " + to_string(level) +
          " | Enemies: " + to_string((int)enemies.size())
          + " (N:" + to_string(cntNormal)
@@ -489,15 +562,17 @@ void renderScreen() {
 int chooseTank() {
   cout << "\x1B[2J\x1B[H" << COL_TEXT;
   cout << "===== CHOOSE YOUR TANK =====\n\n";
-  cout << "1. Standard Tank  - HP:5  Speed:1  FireRate:6 (Balanced)\n";
-  cout << "2. Heavy Tank     - HP:8  Speed:1  FireRate:8 (Strong but slow)\n";
-  cout << "3. Light Tank     - HP:3  Speed:2  FireRate:4 (Fast, weak)\n\n";
-  cout << "Choose 1, 2, or 3: " << colorReset();
+  cout << "1. Standard    - HP:5  Speed:1  FireRate:6  (Balanced)\n";
+  cout << "2. Heavy       - HP:8  Speed:1  FireRate:8  (Armored)\n";
+  cout << "3. Light       - HP:3  Speed:2  FireRate:4  (Agile)\n";
+  cout << "4. Sniper      - HP:4  Speed:1  FireRate:9  (High damage, narrow)\n";
+  cout << "5. RapidFire   - HP:4  Speed:1  FireRate:2  (Very fast shooting)\n";
+  cout << "6. Plasma      - HP:6  Speed:1  FireRate:5  (Energy shots)\n\n";
+  cout << "Choose 1..6: " << colorReset();
   int choice = 1;
   while (!kb_hit()) this_thread::sleep_for(chrono::milliseconds(50));
   choice = kb_get();
-  if (choice == '2') return 2;
-  if (choice == '3') return 3;
+  if (choice >= '1' && choice <= '6') return choice - '0';
   return 1;
 }
 
@@ -505,6 +580,7 @@ void showTitleScreen() {
   cout << "\x1B[2J\x1B[H" << COL_TEXT;
   cout << "=====================================\n";
   cout << "        TANK SHOOTER - v4.0          \n";
+  cout << "    (choose your tank design!)       \n";
   cout << "=====================================\n\n";
   cout << "1. Start Game\n2. Instructions\n3. Quit\n\n";
   cout << colorReset() << "Choose an option: ";
@@ -516,13 +592,14 @@ void showInstructions() {
   cout << "- Move with W/A/S/D.\n";
   cout << "- Shoot with Space.\n";
   cout << "- Avoid or destroy enemies before they hit you.\n";
-  cout << "- New enemy types (v4.0):\n";
-  cout << "   # Normal   - balanced\n";
-  cout << "   /\\ or \\_/  - Fast (sleek)\n";
-  cout << "   +-+...     - Strong (armored)\n";
-  cout << "   & Bouncer  - moves side to side\n";
-  cout << "   Z Zigzag   - erratic movement\n";
-  cout << "   C Chaser   - homes in when near\n\n";
+  cout << "- Enemy types: # Normal, /\\ Fast, ╔ Strong, & Bouncer, Z Zigzag, C Chaser\n\n";
+  cout << "Player tanks (visuals & feel):\n";
+  cout << "  Standard  - '*' shape, balanced\n";
+  cout << "  Heavy     - larger '#' block, slow but tough\n";
+  cout << "  Light     - '+' quick, compact\n";
+  cout << "  Sniper    - '^' turret, stronger bullets\n";
+  cout << "  RapidFire - '=' barrel, fires very fast\n";
+  cout << "  Plasma    - 'Ω' style, energy bullets\n\n";
   cout << "Press any key to return.\n" << colorReset();
   while (!kb_hit()) this_thread::sleep_for(chrono::milliseconds(50));
   kb_get();
@@ -535,9 +612,12 @@ void runGameLoop() {
   running = true;
 
   int choice = chooseTank();
-  if (choice == 1) player = {WIDTH/2, HEIGHT-4, 5, "Standard", 1, 6};
-  else if (choice == 2) player = {WIDTH/2, HEIGHT-4, 8, "Heavy", 1, 8};
-  else player = {WIDTH/2, HEIGHT-4, 3, "Light", 2, 4};
+  if (choice == 1) player = Tank(WIDTH/2, HEIGHT-4, 5, "Standard", 1, 6, 1, 1, 0);
+  else if (choice == 2) player = Tank(WIDTH/2, HEIGHT-4, 8, "Heavy", 1, 8, 1, 1, 0);
+  else if (choice == 3) player = Tank(WIDTH/2, HEIGHT-4, 3, "Light", 2, 4, 1, 1, 0);
+  else if (choice == 4) player = Tank(WIDTH/2, HEIGHT-4, 4, "Sniper", 1, 9, 2, 1, 0);
+  else if (choice == 5) player = Tank(WIDTH/2, HEIGHT-4, 4, "RapidFire", 1, 2, 1, 1, 0);
+  else player = Tank(WIDTH/2, HEIGHT-4, 6, "Plasma", 1, 5, 1, 1, 0);
 
   cout << "\x1B[?25l"; // hide cursor
   spawnEnemiesByLevel();
@@ -554,7 +634,7 @@ void runGameLoop() {
 
   cout << "\x1B[?25h"; // show cursor
   cout << "\x1B[2J\x1B[H" << COL_TEXT;
-  cout << "\n?? GAME OVER ??\n\n";
+  cout << "\n💥 GAME OVER 💥\n\n";
   cout << "Final Score: " << score << "\n";
   cout << "Level Reached: " << level << "\n";
   cout << "Press 'r' to restart or any key to return.\n";

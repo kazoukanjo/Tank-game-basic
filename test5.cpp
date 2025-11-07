@@ -1,5 +1,5 @@
-// tank_shooter_v4_powerups.cpp
-// Tank Shooter v4.3 - PowerUps + Boss Skills (Laser & Bomb Rain)
+// tank_shooter_v5_powerups.cpp
+// Tank Shooter v5 - PowerUps + Boss Skills (Laser & Bomb Rain)
 // Merged from previous v4 with added features: items, power-ups, boss skills
 
 #include <iostream>
@@ -795,7 +795,7 @@ int chooseTank() {
 void showTitleScreen() {
   cout << "\x1B[2J\x1B[H" << COL_TEXT;
   cout << "=====================================\n";
-  cout << "        TANK SHOOTER - v4.3          \n";
+  cout << "        TANK SHOOTER - v5.0          \n";
   cout << "    (PowerUps & Boss Skills added)   \n";
   cout << "=====================================\n\n";
   cout << "1. Start Game\n2. Instructions\n3. Tank & Enemy Info\n4. Quit\n\n";
@@ -904,3 +904,4 @@ int main() {
   cout << colorReset() << "\nGoodbye!\n";
   return 0;
 }
+

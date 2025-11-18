@@ -27,7 +27,11 @@ Các loại xe tăng có đặc điểm riêng:
 
 🟦 Light: Di chuyển nhanh, máu ít, bắn liên tục.
 
+   Sniper: Tầm bắn xa nhất 
 
+   Rapidfire: Size đạn to, đạn bắn nhanh hơn.
+
+   Plasma: Di chuyển linh hoạt, smooth, tầm bắn vừa phải.
 
 💣 Hệ thống kẻ địch phong phú (v5.0):
 
@@ -42,6 +46,8 @@ Bouncer: Nảy sang hai bên, khó đoán hướng.
 Zigzag: Di chuyển theo đường zíc-zắc.
 
 Chaser (mới): Đuổi theo người chơi khi ở gần, thông minh hơn.
+
+ Boss: Đủ 150₫ exp sẽ xuất hiện.
 
 💥 Điểm nổi bật bản 4.0:
 
@@ -72,7 +78,7 @@ Chuẩn bị cho Tank Shooter v5.0, với boss, vật phẩm và bản đồ ng�
 📘 Phiên bản mô tả cho bài media / đồ án học tập:
 
 Tóm tắt:
-“Tank Shooter v4.0” là trò chơi bắn xe tăng 2D chạy trong giao diện dòng lệnh, được lập trình hoàn toàn bằng ngôn ngữ C++. Dự án tập trung vào việc xây dựng vòng lặp game (game loop), xử lý nhập liệu thời gian thực, hiển thị bằng ký tự ASCII có màu, và AI cơ bản cho kẻ địch.
+“Tank Shooter v5.0” là trò chơi bắn xe tăng 2D chạy trong giao diện dòng lệnh, được lập trình hoàn toàn bằng ngôn ngữ C++. Dự án tập trung vào việc xây dựng vòng lặp game (game loop), xử lý nhập liệu thời gian thực, hiển thị bằng ký tự ASCII có màu, và AI cơ bản cho kẻ địch.
 
 Mục tiêu học tập:
 
@@ -86,7 +92,7 @@ Thiết kế gameplay với nhiều loại đối thủ và hành vi riêng bi�
 
 🔥 Phiên bản mô tả truyền thông (dạng mô tả hấp dẫn):
 
-“Tank Shooter v4.0 – Cuộc chiến sinh tồn trên màn hình dòng lệnh!
+“Tank Shooter v5.0 – Cuộc chiến sinh tồn trên màn hình dòng lệnh!
 Hóa thân thành chỉ huy xe tăng, băng qua biển đạn và hàng loạt kẻ thù từ chậm chạp, nảy sang hai bên, đến những cỗ máy truy đuổi điên cuồng.
 Mỗi viên đạn, mỗi pha né tránh là một trận chiến sống còn.
 Đồ họa ASCII nay đã rực rỡ hơn bao giờ hết – nhỏ gọn, mượt mà và đầy cảm xúc.

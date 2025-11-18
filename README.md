@@ -1,4 +1,4 @@
-Tên game: Tank Shooter v4.0
+Tên game: Tank Shooter v5.0
 Thể loại: Hành động – Bắn súng – Arcade cổ điển (console C++)
 Ngôn ngữ lập trình: C++
 Nền tảng: Console (Windows / Linux Terminal)
@@ -27,7 +27,9 @@ Các loại xe tăng có đặc điểm riêng:
 
 🟦 Light: Di chuyển nhanh, máu ít, bắn liên tục.
 
-💣 Hệ thống kẻ địch phong phú (v4.0):
+
+
+💣 Hệ thống kẻ địch phong phú (v5.0):
 
 Normal: Tiến thẳng xuống – dễ tiêu diệt.
 

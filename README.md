@@ -49,7 +49,7 @@ Chaser (mới): Đuổi theo người chơi khi ở gần, thông minh hơn.
 
  Boss: Đủ 150₫ exp sẽ xuất hiện.
 
-💥 Điểm nổi bật bản 4.0:
+💥 Điểm nổi bật bản 5.0:
 
 Hệ thống AI enemy nâng cao (chaser, zigzag, bouncer).
 
